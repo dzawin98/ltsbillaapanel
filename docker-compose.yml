@@ -1,0 +1,67 @@
+version: '3.8'
+
+services:
+  # MySQL Database
+  mysql:
+    image: mysql:8.0
+    container_name: rtrw-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: rtrw_db_production
+      MYSQL_USER: rtrw_user
+      MYSQL_PASSWORD: rtrw_password
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./database-setup.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - rtrw-network
+
+  # Backend Application
+  backend:
+    build: .
+    container_name: rtrw-backend
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_NAME: rtrw_db_production
+      DB_USER: rtrw_user
+      DB_PASSWORD: rtrw_password
+      TZ: Asia/Jakarta
+    ports:
+      - "3001:3001"
+    depends_on:
+      - mysql
+    volumes:
+      - ./logs:/app/logs
+    networks:
+      - rtrw-network
+
+  # Nginx Reverse Proxy
+  nginx:
+    image: nginx:alpine
+    container_name: rtrw-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf
+      - ./dist:/usr/share/nginx/html
+    depends_on:
+      - backend
+    networks:
+      - rtrw-network
+
+volumes:
+  mysql_data:
+    driver: local
+
+networks:
+  rtrw-network:
+    driver: bridge
